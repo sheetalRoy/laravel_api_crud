@@ -53,4 +53,50 @@ class ResultController extends Controller
             'value' => $value
         ];
     }
+
+	/* Register */
+    public function register(Request $request)
+    {
+        $email = $request->get('email');
+        // $validated = $request->validate([
+        //     'email' => 'required',
+        // ]);
+        $validator = Validator::make($request->all(), [
+            'email' => 'required',
+        ]);
+        if($validator->fails()){
+            return $validator->errors();
+        }else{
+            $hashedMail = User::hashMail($email);
+            if (User::where('email', $hashedMail)->exists()) {
+                return[
+                    'message' => 'email_in_use',
+                    'status'=>201
+                ];
+            }
+            $user = new User();
+            $user->email = $hashedMail;
+            $user->results = NULL;
+            do {
+                $code = strtoupper(substr(md5(time()), 0, 8));
+            } while (User::where('code', $code)->exists());
+
+            $user->code = $code;
+            $user->save();
+            Mail::to($email)->send(new RegisterMail($code));
+            if($user){
+                    return [
+                    'user' => $user,
+                    'status' => 200,
+                    'message' => 'Register successfully'
+                ];
+            }else{
+                return [
+                    'status' => 400,
+                    'message' => 'Something went wrong!'
+                ];
+            }
+        }
+        
+    }
 }
