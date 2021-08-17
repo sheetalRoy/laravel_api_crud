@@ -99,4 +99,82 @@ class ResultController extends Controller
         }
         
     }
+	public function updateResults(ResultsUpdateRequest $request)
+    {
+        if(Session::has('user')){
+            $code = Session::get('user')->code;
+            $user = User::where('code', $code)->first();
+            $results = [];
+            if($user->results && $user->results!='null'){
+                $previous_result = json_decode($user->results);
+                foreach ($previous_result as $key => $data) {
+                    if($key!=date('d/m/Y')){
+                        $results[$key] = $data;
+                    }
+                }
+            }
+            $results[date('d/m/Y')] = $request->input('results');
+            $user->results = json_encode($results);
+            $user->save();
+            return response()->json([], 200);
+        }else{
+            session(['guestResult' => $request->input('results')]);
+            return response()->json([], 200); 
+        }
+    }
+	 public function favinsert(Request $request) 
+    { 
+        $validator = Validator::make($request->all(), [ 
+            'key' => 'required', 
+            'value' => 'required',
+        ]);
+        if ($validator->fails()) { 
+            return response()->json(['error'=>$validator->errors()], 401);            
+        }
+        $input = $request->all();
+
+        $existed = Favcontent::where('key','=',$input['key'])->first();
+        
+        
+    	if ($existed) {
+
+            $existed_array = Favcontent::where('key','=',$input['key'])->get()->toArray();
+            $existed_array_value = $existed_array[0]['value'];
+            $oldValue = json_decode($existed_array_value, true);
+            $inputData = $input['value'][0];
+            $nid = $inputData['nid'];
+            $fev = $inputData['favorite'];
+            $nids = array_column($oldValue, 'nid');
+            if (in_array($nid, $nids, true)) {
+                $key = array_search($nid, $nids);
+                $oldValue[$key]['favorite']= $fev;
+                $newupdated = json_encode($oldValue);
+                $up = Favcontent::where('key','=',$input['key'])->update(['value' => $newupdated]);
+                $success['success'] =  'Record updated';
+            } else {  
+                $oldValue[] = array('nid'=> $nid, 'favorite'=> $fev);
+                $newupdated = json_encode($oldValue);
+                $up = Favcontent::where('key','=',$input['key'])->update(['value' => $newupdated]);
+                $success['success'] =  'Record updated';
+            }
+    	} else {
+    		$input['value'] = json_encode($input['value']);
+    		$insert = Favcontent::create($input);
+	        $success['success'] =  'Record added';	
+    	}
+        return response()->json(['success'=>$success], 200); 
+    }
+
+    function favget($key='') {
+	$fav = Favcontent::where('key','=',$key)->select('key','value')->first();
+	if (isset($fav->key)) {
+		$success['success'] =  'Response data';
+		$success['data'] =  ["key"=>$fav->key, "value"=> json_decode($fav->value,true)];
+	}
+	else {
+    		$success['success'] =  'No Response data';
+    		$success['data'] =  [];
+	}
+	return response()->json(['success'=>$success], 200);
+    }
 }
